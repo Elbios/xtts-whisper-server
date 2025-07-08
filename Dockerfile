@@ -1,38 +1,68 @@
-# syntax=docker/dockerfile:1
+# ----------------- 1) build Whisper.cpp with CUDA -----------------
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel AS whisper-build
 
-FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime AS base
-LABEL description="XTTS API server + Whisper.cpp (CUDA) slim"
+ARG WCPP_VER=v1.7.6            # tag or commit
+WORKDIR /opt
 
-ARG DEBIAN_FRONTEND=noninteractive
-ARG WCPP_VER=v1.7.6
-ARG WCPP_ZIP=whisper-cublas-12.4.0-bin-x64.zip
-
-# ---- OS packages (single layer, cleaned) ----
+# build toolchain
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ffmpeg libportaudio2 libasound2 wget unzip ca-certificates && \
+        git cmake build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# source + compile
+RUN git clone --depth 1 --branch ${WCPP_VER} https://github.com/ggml-org/whisper.cpp.git
+WORKDIR /opt/whisper.cpp
+RUN cmake -B build -DGGML_CUDA=1 -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j $(nproc) --config Release   # needs nvcc :contentReference[oaicite:1]{index=1}
+
+# ----------------- 2) final, slim runtime image -----------------
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
+
+LABEL description="XTTS + Whisper.cpp CUDA server"
+
+# minimal OS libs
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ffmpeg gcc portaudio19-dev libasound2 ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ---- Python deps ----
+# ---------- Python deps ----------
 WORKDIR /app
 COPY requirements.txt .
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip cache purge          # extra safety
+    pip cache purge        # drop wheel cache
 
-# ---- App code & speakers ----
+# ---------- App assets ----------
 COPY latent_speaker_folder ./latent_speaker_folder
-COPY xtts_models            ./xtts_models       # keep or mount, see §5
-COPY xtts_api_server        ./xtts_api_server
+COPY xtts_models ./xtts_models
+# Copy the application source code and setup.py to /app directory
+COPY xtts-api-server ./xtts-api-server
 
-# ---- Whisper.cpp CUDA binary (~443 MB) ----
-RUN wget -q https://github.com/ggml-org/whisper.cpp/releases/download/${WCPP_VER}/${WCPP_ZIP} \
- && unzip -q ${WCPP_ZIP} -d /opt/whispercpp \
- && rm ${WCPP_ZIP} \
- && ln -s /opt/whispercpp/main /usr/local/bin/whisper   # easy cli access
+# Install the application
+WORKDIR /app/xtts-api-server
+RUN pip install .
+WORKDIR /app
 
-ENV HF_HOME=/root/.cache/huggingface \
-    PATH="/opt/whispercpp:${PATH}"
+# Cleanup gcc
+RUN apt-get purge -y gcc && apt-get autoremove -y
 
-EXPOSE 8020
-CMD ["python", "-m", "xtts_api_server", "--listen", "-p", "8020", "--deepspeed"]
+ENV LD_LIBRARY_PATH=/opt/conda/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:/opt/conda/lib/python3.11/site-packages/nvidia/cublas/lib:$LD_LIBRARY_PATH
+
+# ---------- Whisper binaries ----------
+COPY --from=whisper-build /opt/whisper.cpp/build/bin /opt/whispercpp
+COPY --from=whisper-build /opt/whisper.cpp/build/src/libwhisper.so* /usr/local/lib/
+COPY --from=whisper-build /opt/whisper.cpp/build/ggml/src/libggml* /usr/local/lib/
+COPY --from=whisper-build /opt/whisper.cpp/build/ggml/src/ggml-cuda/libggml-cuda.so /usr/local/lib/
+RUN ldconfig
+RUN ln -s /opt/whispercpp/whisper-server /usr/local/bin/whisper-server && \
+    ln -s /opt/whispercpp/whisper-cli    /usr/local/bin/whisper
+
+# ---------- startup script ----------
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENV HF_HOME=/root/.cache/huggingface
+EXPOSE 8020 8080
+ENTRYPOINT ["docker-entrypoint.sh"]
