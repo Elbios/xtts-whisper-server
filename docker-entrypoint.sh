@@ -19,8 +19,8 @@ whisper-server --host 0.0.0.0 --port 8080 --model "${MODEL_FILE}" \
 WHISPER_PID=$!
 
 python -m xtts_api_server --listen -p 8020 \
-        -lsf 'latent_speaker_folder' -o 'output' \
-        -mf 'xtts_models' -d 'cuda' --deepspeed \
+        -lsf '/app/latent_speaker_folder' -o '/app/output' \
+        -mf '/app/xtts_models' -d 'cuda' --deepspeed \
   2>&1 | tee -a "$LOG" &
 XTTS_PID=$!
 

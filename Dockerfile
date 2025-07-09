@@ -64,9 +64,9 @@ RUN pip install --no-cache-dir /tmp/deepspeed-0.17.1*.whl && rm /tmp/deepspeed-0
 # 6. Copy application assets into the image
 COPY xtts-api-server ./xtts-api-server
 
+COPY latent_speaker_folder /app/latent_speaker_folder
+COPY xtts_models /app/xtts_models
 WORKDIR /app/xtts-api-server
-COPY latent_speaker_folder ./latent_speaker_folder
-COPY xtts_models ./xtts_models
 
 # 7. Update the library path for CUDA components within the Python environment
 ENV LD_LIBRARY_PATH=/opt/conda/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:/opt/conda/lib/python3.11/site-packages/nvidia/cublas/lib:$LD_LIBRARY_PATH

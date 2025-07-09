@@ -1,0 +1,17 @@
+PyAudio==0.2.14
+requests==2.31.0
+pyttsx3==2.90
+stream2sentence==0.2.2
+fastapi>=0.104.1
+loguru
+pydantic==2.9.2
+pydub
+python-dotenv
+torch==2.7
+torchaudio==2.7
+uvicorn
+cutlet
+fugashi[unidic-lite]
+coqui-tts==0.26.2
+transformers==4.51.3
+spacy==3.7.4
