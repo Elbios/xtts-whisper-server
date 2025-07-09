@@ -1,5 +1,5 @@
 # ----------------- 1) build Whisper.cpp with CUDA -----------------
-FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel AS whisper-build
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel AS whisper-ds-build
 
 ARG WCPP_VER=v1.7.6
 #ARG WCPP_VER=v1.7.4
@@ -13,6 +13,9 @@ RUN git clone --depth 1 --branch ${WCPP_VER} https://github.com/ggml-org/whisper
 WORKDIR /opt/whisper.cpp
 RUN cmake -B build -DGGML_CUDA=1 -DCMAKE_BUILD_TYPE=Release \
  && cmake --build build -j $(nproc) --config Release
+ 
+RUN python -m pip install --no-cache-dir --upgrade pip wheel \
+ && pip wheel deepspeed==0.17.1 --wheel-dir /tmp/deepspeed-wheels
 
 # ----------------- 2) final runtime image -----------------
 FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel
@@ -30,9 +33,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
+    pip install torch torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/cu128 && \
     pip cache purge
-
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+	
+# ---- DeepSpeed wheel built earlier ----
+COPY --from=whisper-ds-build /tmp/deepspeed-wheels/deepspeed-0.17.1*.whl /tmp/
+RUN pip install --no-cache-dir /tmp/deepspeed-0.17.1*.whl && rm /tmp/deepspeed-0.17.1*.whl
 
 # ---------- App assets ----------
 #COPY latent_speaker_folder ./latent_speaker_folder
