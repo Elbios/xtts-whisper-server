@@ -1,13 +1,12 @@
 # ----------------- 1) build Whisper.cpp with CUDA -----------------
-FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04 AS whisper-build
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel AS whisper-build
 
 ARG WCPP_VER=v1.7.6
 WORKDIR /opt
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 python3-pip git cmake build-essential && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends git cmake build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth 1 --branch ${WCPP_VER} https://github.com/ggml-org/whisper.cpp.git
 WORKDIR /opt/whisper.cpp
@@ -17,11 +16,8 @@ RUN cmake -B build -DGGML_CUDA=1 -DCMAKE_BUILD_TYPE=Release \
 RUN python -m pip install --no-cache-dir --upgrade pip wheel \
  && pip wheel deepspeed==0.17.1 --wheel-dir /tmp/deepspeed-wheels
 
-RUN apt-get purge -y git cmake build-essential && \
-    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 # ----------------- 2) final runtime image -----------------
-FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 AS runtime
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
 
 LABEL description="XTTS + Whisper.cpp CUDA server"
 
@@ -31,6 +27,7 @@ LABEL description="XTTS + Whisper.cpp CUDA server"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg portaudio19-dev libasound2 \
+        gcc g++ make           \
         ca-certificates wget && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -55,8 +52,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cu128 && \
     pip cache purge
 
 # ---- DeepSpeed wheel built earlier ----
