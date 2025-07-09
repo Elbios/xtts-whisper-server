@@ -13,7 +13,7 @@ if [[ ! -f "${MODEL_FILE}" ]]; then
 fi
 
 # Start servers
-whisper-server --port 8080 &
-exec python -m xtts_api_server --listen -p 8020 \
-     -lsf 'latent_speaker_folder' -o 'output' \
-     -mf 'xtts_models' -d 'cuda' --deepspeed
+whisper-server --host 0.0.0.0 --port 8080 --model ${MODEL_FILE} &
+#exec python -m xtts_api_server --listen -p 8020 \
+#     -lsf 'latent_speaker_folder' -o 'output' \
+ #    -mf 'xtts_models' -d 'cuda' --deepspeed

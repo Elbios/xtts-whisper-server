@@ -2,6 +2,7 @@
 FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel AS whisper-build
 
 ARG WCPP_VER=v1.7.6
+#ARG WCPP_VER=v1.7.4
 WORKDIR /opt
 
 RUN apt-get update && \
@@ -14,14 +15,14 @@ RUN cmake -B build -DGGML_CUDA=1 -DCMAKE_BUILD_TYPE=Release \
  && cmake --build build -j $(nproc) --config Release
 
 # ----------------- 2) final runtime image -----------------
-FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel
 
 LABEL description="XTTS + Whisper.cpp CUDA server"
 
 # Minimal OS libs
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ffmpeg gcc portaudio19-dev libasound2 ca-certificates && \
+        ffmpeg gcc portaudio19-dev libasound2 ca-certificates wget && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ---------- Python deps ----------
@@ -31,16 +32,18 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip cache purge
 
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+
 # ---------- App assets ----------
-COPY latent_speaker_folder ./latent_speaker_folder
-COPY xtts_models ./xtts_models
+#COPY latent_speaker_folder ./latent_speaker_folder
+#COPY xtts_models ./xtts_models
 COPY xtts-api-server ./xtts-api-server
 
 WORKDIR /app/xtts-api-server
-RUN pip install .
-WORKDIR /app
+#RUN pip install .
+#WORKDIR /app
 
-ENV LD_LIBRARY_PATH=/opt/conda/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:/opt/conda/lib/python3.11/site-packages/nvidia/cublas/lib:$LD_LIBRARY_PATH
+#ENV LD_LIBRARY_PATH=/opt/conda/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:/opt/conda/lib/python3.11/site-packages/nvidia/cublas/lib:$LD_LIBRARY_PATH
 
 # ---------- Whisper binaries ----------
 COPY --from=whisper-build /opt/whisper.cpp/build/bin /opt/whispercpp
@@ -59,7 +62,9 @@ COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # ---------- Whisper model settings ----------
-ENV WHISPER_MODEL=large-v3-turbo \
+#ENV WHISPER_MODEL=large-v3-turbo \
+ #   WHISPER_MODELS_DIR=/opt/whispercpp/models
+ENV WHISPER_MODEL=base.en \
     WHISPER_MODELS_DIR=/opt/whispercpp/models
 
 EXPOSE 8020 8080
