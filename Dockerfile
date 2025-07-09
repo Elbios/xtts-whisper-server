@@ -21,11 +21,31 @@ FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
 
 LABEL description="XTTS + Whisper.cpp CUDA server"
 
-# Minimal OS libs
+# ------------------------------------------------------------------
+# 1. OS libs *plus* a tiny build tool-chain (g++ & make) for nvcc
+# ------------------------------------------------------------------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ffmpeg gcc portaudio19-dev libasound2 ca-certificates wget && \
+        ffmpeg portaudio19-dev libasound2 \
+        gcc g++ make           \
+        ca-certificates wget && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------
+# 2. Copy nvcc and headers from the builder (adds ~330 MB)
+# ------------------------------------------------------------------
+#   - /usr/local/cuda/bin/  - nvcc + helper scripts
+#   - /usr/local/cuda/include - <cuda*.h> headers
+#     (link-time libs already exist in the runtime image's lib64)
+RUN mkdir -p /usr/local/cuda/lib64
+COPY --from=whisper-build /usr/local/cuda/lib64/libcudart.so* /usr/local/cuda/lib64/
+COPY --from=whisper-build /usr/local/cuda/lib64/libcurand.so* /usr/local/cuda/lib64/
+COPY --from=whisper-build /usr/local/cuda/bin      /usr/local/cuda/bin
+COPY --from=whisper-build /usr/local/cuda/include  /usr/local/cuda/include
+COPY --from=whisper-build /usr/local/cuda/nvvm     /usr/local/cuda/nvvm
+
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH="${CUDA_HOME}/bin:${PATH}"
 
 # ---------- Python deps ----------
 WORKDIR /app
