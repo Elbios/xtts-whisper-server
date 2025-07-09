@@ -1,5 +1,5 @@
 # ----------------- 1) build Whisper.cpp with CUDA -----------------
-FROM nvidia/cuda:12.8.0-devel-ubuntu22.04 AS whisper-build
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04 AS whisper-build
 
 ARG WCPP_VER=v1.7.6
 WORKDIR /opt
@@ -21,7 +21,7 @@ RUN apt-get purge -y git cmake build-essential && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ----------------- 2) final runtime image -----------------
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04 AS runtime
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 AS runtime
 
 LABEL description="XTTS + Whisper.cpp CUDA server"
 
