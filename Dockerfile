@@ -17,7 +17,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip wheel \
  && pip wheel deepspeed==0.17.1 --wheel-dir /tmp/deepspeed-wheels
 
 # ----------------- 2) final runtime image -----------------
-FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
 
 LABEL description="XTTS + Whisper.cpp CUDA server"
 
@@ -46,6 +46,8 @@ COPY xtts_models ./xtts_models
 COPY xtts-api-server ./xtts-api-server
 
 WORKDIR /app/xtts-api-server
+
+ENV LD_LIBRARY_PATH=/opt/conda/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:/opt/conda/lib/python3.11/site-packages/nvidia/cublas/lib:$LD_LIBRARY_PATH
 
 # ---------- Whisper binaries ----------
 COPY --from=whisper-build /opt/whisper.cpp/build/bin /opt/whispercpp
