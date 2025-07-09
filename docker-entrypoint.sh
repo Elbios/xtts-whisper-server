@@ -1,4 +1,3 @@
-# docker-entrypoint.sh
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -12,9 +11,6 @@ if [[ ! -f "${MODEL_FILE}" ]]; then
   echo "Downloading Whisper model: ${WHISPER_MODEL}"
   /opt/whispercpp/download-ggml-model.sh "${WHISPER_MODEL}" "${WHISPER_MODELS_DIR}"
 fi
-
-# Provide legacy path expected by some code
-ln -sfn "${WHISPER_MODELS_DIR}" /app/models
 
 # Start servers
 whisper-server --port 8080 &

@@ -18,11 +18,11 @@ FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
 
 LABEL description="XTTS + Whisper.cpp CUDA server"
 
-# Minimal OS libs (keep portaudio19-dev as requested)
+# Minimal OS libs
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg gcc portaudio19-dev libasound2 ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ---------- Python deps ----------
 WORKDIR /app
