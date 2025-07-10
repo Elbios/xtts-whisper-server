@@ -1,3 +1,6 @@
 DOCKER_BUILDKIT=1 docker buildx build -t elbios/xtts-whisper:latest .
 
 docker run -p 8020:8020 -p 8080:8080 --gpus all -it --rm elbios/xtts-whisper:latest
+
+hash of xtts-api-server: 5650e3fb4743f49afeced05ead5f602d4c183b73
+from: https://github.com/Haurrus/xtts-api-server-mantella.git
