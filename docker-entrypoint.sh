@@ -24,6 +24,9 @@ python -m xtts_api_server --listen -p 8020 \
   2>&1 | tee -a "$LOG" &
 XTTS_PID=$!
 
+# Announce idle timeout before starting watchdog
+echo "[watchdog] MAX_IDLE_SECONDS set to ${MAX_IDLE_SECONDS:-1800}"
+
 # Background watchdog: stop instance if $LOG silent > MAX_IDLE
 (
   MAX_IDLE=${MAX_IDLE_SECONDS:-1800}   # default to 30 min if unset
@@ -35,7 +38,8 @@ XTTS_PID=$!
           mins=$(( idle / 60 ))
           secs=$(( idle % 60 ))
           printf "[watchdog] No log activity for %dm%02ds - stopping instance\n" "$mins" "$secs"
-          vastai --api-key "$CONTAINER_API_KEY" stop instance "$CONTAINER_ID"
+          vastai set api-key "$CONTAINER_API_KEY"
+          vastai stop instance "$CONTAINER_ID"
       fi
       sleep 60
   done
