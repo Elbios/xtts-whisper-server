@@ -15,7 +15,7 @@ RUN apt-get update && \
 # Clone and build Whisper.cpp with CUDA support
 RUN git clone --depth 1 --branch ${WCPP_VER} https://github.com/ggml-org/whisper.cpp.git
 WORKDIR /opt/whisper.cpp
-RUN cmake -B build -DGGML_CUDA=1 -DCMAKE_BUILD_TYPE=Release \
+RUN cmake -B build -DGGML_CUDA=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="50;60;61;70;75;80;86;89;90" \
  && cmake --build build -j $(nproc) --config Release
 
 # Build the DeepSpeed wheel for later installation
@@ -55,6 +55,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir vastai && \
+    pip install --no-cache-dir --upgrade "python-dateutil>=2.8.2" && \
     pip cache purge
 
 # 5. Install the DeepSpeed wheel that was built in the first stage

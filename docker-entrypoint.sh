@@ -24,17 +24,18 @@ python -m xtts_api_server --listen -p 8020 \
   2>&1 | tee -a "$LOG" &
 XTTS_PID=$!
 
-# Background watchdog: stop instance if $LOG silent > 30 min
+# Background watchdog: stop instance if $LOG silent > MAX_IDLE
 (
-  MAX_IDLE=${MAX_IDLE_SECONDS:-1800}   # fall back to 30 min if env var not set
+  MAX_IDLE=${MAX_IDLE_SECONDS:-1800}   # default to 30 min if unset
   while true; do
-      last_change=$(stat -c %Y "$LOG")     # epoch-seconds mtime
+      last_change=$(stat -c %Y "$LOG")
       now=$(date +%s)
-      if (( now - last_change > MAX_IDLE )); then
-          echo "[watchdog] No log activity for 30 min - destroying instance"
-          vastai --api-key "$(cat /root/.vast_api_key)" \
-                 stop instance "$VAST_CONTAINERLABEL"
-          # container disappears in ~2 s, so nothing after this matters
+      idle=$(( now - last_change ))
+      if (( idle > MAX_IDLE )); then
+          mins=$(( idle / 60 ))
+          secs=$(( idle % 60 ))
+          printf "[watchdog] No log activity for %dm%02ds - stopping instance\n" "$mins" "$secs"
+          vastai --api-key "$CONTAINER_API_KEY" stop instance "$CONTAINER_ID"
       fi
       sleep 60
   done
