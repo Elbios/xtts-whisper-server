@@ -46,9 +46,26 @@ COPY --from=whisper-build /usr/local/cuda/bin     /usr/local/cuda/bin
 COPY --from=whisper-build /usr/local/cuda/include /usr/local/cuda/include
 COPY --from=whisper-build /usr/local/cuda/nvvm    /usr/local/cuda/nvvm
 
+# Copy the stubs for compilation/linking (includes libcuda.so stub)
+COPY --from=whisper-build /usr/local/cuda/lib64/stubs /usr/local/cuda/lib64/stubs
+# For device runtime and static linking (fixes -lcudadevrt and -lcudart_static)
+COPY --from=whisper-build /usr/local/cuda/lib64/libcudadevrt* /usr/local/cuda/lib64/
+COPY --from=whisper-build /usr/local/cuda/lib64/libcudart_static* /usr/local/cuda/lib64/
+
+# Symlink for NVML stub (fixes compilation without overriding runtime NVML)
+RUN ln -s /usr/local/cuda/lib64/stubs/libnvidia-ml.so /usr/local/cuda/lib64/stubs/libnvidia-ml.so.1
+
+# Configure ldconfig to include ONLY non-stub CUDA paths (for runtime linking)
+RUN echo "/usr/local/cuda/lib64" > /etc/ld.so.conf.d/cuda.conf && \
+    ldconfig
+	
 # 3. Set environment variables for CUDA
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH="${CUDA_HOME}/bin:${PATH}"
+
+ENV LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
+
+ENV LIBRARY_PATH="${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs:${LIBRARY_PATH}"
 
 # 4. Set up the application directory and install Python dependencies
 WORKDIR /app
